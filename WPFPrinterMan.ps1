@@ -7,6 +7,7 @@
     PrinterManagement Module and PrintUI.exe.
 #>
 
+# Main window markup
 $xaml = @'
 <Window 
  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" 
@@ -110,6 +111,7 @@ $xaml = @'
 </Window>
 
 '@
+# Quick install popup window markup
 $xaml1 = @'
     <Window
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -222,6 +224,7 @@ function Invoke-Update{
     }
     else
     {
+        # if computer is not found, display error
         $tempObj = New-Object -TypeName PSObject
         $tempObj | Add-Member -MemberType NoteProperty -Name Name -Value "Computer not responding. `nCheck to make sure the computer `nis online"
         $window.listViewPrinters.ItemsSource = @($tempObj)
@@ -229,7 +232,7 @@ function Invoke-Update{
         $window.listViewPorts.ItemsSource = @($tempObj)
     }
 
-    Subscribe-PortClickEvents
+    # Subscribe-PortClickEvents
 
 }
 
@@ -339,15 +342,17 @@ function Remove-Port_Click{
     }
 }
 
+# Currently using doubleclick to open up the browser to the selected IP printers
+
 # Subscribes the TextBlocks of the IP address to a click event
-function Subscribe-PortClickEvents{
-    #$ports = $window.listViewPrinters.Items.
-    $portAddress = ($window.listViewPorts.Items | ? {$_.Name -like $portName}).printerhostaddress
-    if( $portAddress -match '^\b(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\b$')
-    {
-        Start-Process "http://$portAddress"
-    }
-}
+# function Subscribe-PortClickEvents{
+#     #$ports = $window.listViewPrinters.Items.
+#     $portAddress = ($window.listViewPorts.Items | ? {$_.Name -like $portName}).printerhostaddress
+#     if( $portAddress -match '^\b(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\b$')
+#     {
+#         Start-Process "http://$portAddress"
+#     }
+# }
 
 # Fills in Computer TextBox with local computer name and then Updates the list.
 function Invoke-Initialize{
@@ -360,14 +365,13 @@ function Invoke-Initialize{
     Invoke-Update
 }
 
-
 # Printer Add Pop-Up Window functions
 function Validate-Printer{
     
     $isValidIPAddress = ($window1.comboBoxPrinterConnection.Text -like $Global:PrinterConnections[0] -and $window1.textBoxPrinterConnection.Text.Trim() -match
         '^\b(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\b$'
     )
-    $isValidPrinterName = $window1.textBoxPrinterName.Text -ne ""
+    $isValidPrinterName = ($window1.textBoxPrinterName.Text -ne "")
     $isValidPrintServerConnection = ($window1.comboBoxPrinterConnection.Text -like $Global:PrinterConnections[1] -and
         $window1.textBoxPrinterConnection.Text.Trim() -match '^\\\\\w+\\\w+$'
     )
@@ -401,7 +405,7 @@ function Write-Console($str){
     $window1.textBoxConsole.Text += "$str`n"
     $window1.textboxConsole.ScrollToEnd()
 }
-function Invoke-AddPrinterWindow{
+function Invoke-ShowAddPrinterWindow{
 
     $window1 = Convert-XAMLtoWindow -XAML $xaml1
     $window1.Title = "Add Printer:  " + $window.Title
@@ -442,6 +446,10 @@ function Invoke-AddPrinterWindow{
     $null = Show-WPFWindow -Window $window1
 }
 function Install-Printer([switch] $stop){
+    
+    # Check if printer is valid
+    $computer = $Global:ComputerName
+    $printer = Validate-Printer
 
     # Check if buttonInstallPrinter is set to install or stop installation
     if($window1.buttonInstallPrinter.Content -like "Stop" -or $stop){
@@ -450,17 +458,13 @@ function Install-Printer([switch] $stop){
         $global:aSync.PowerShell.Stop()
         Write-Console "Cancelled install"
         return
-    } else {
-        $window1.buttonInstallPrinter.Content = "Stop"
-        $window1.buttonInstallPrinter.ToolTip = "Cancel install"
-    }
-
-    # Check if printer is valid
-    $computer = $Global:ComputerName
-    $printer = Validate-Printer
-    if($null -eq $printer) {
+    } elseif($null -eq $printer) {
         return
     }
+
+    $window1.buttonInstallPrinter.Content = "Stop"
+    $window1.buttonInstallPrinter.ToolTip = "Cancel install"
+    
 
     # Create Thread
     $InstallRunspace = [runspacefactory]::CreateRunspace()
@@ -619,9 +623,8 @@ $window.listViewPorts.add_KeyDown({
     }
 })
 
-<# Adds a reg value to allow PrinterMangement Module to view spooler information
-   Then it restarts the spooler.
-#>
+# Adds a reg value to allow PrinterMangement Module to view spooler information
+# Then it restarts the spooler.
 $window.btnRestartSpooler.add_Click({
     reg add "\\$global:ComputerName\HKLM\Software\Policies\Microsoft\Windows NT\Printers" /v RegisterSpoolerRemoteRpcEndPoint /t REG_DWORD /d 1 /f
     Get-Service -ComputerName $global:ComputerName -Name Spooler | Restart-Service
@@ -635,7 +638,8 @@ $window.btnPrintServerProperties.add_Click({
     Invoke-Update
     Open-PrintServerProperties
 })
-<# The following closed events trigger the appropriate wizard to open based on
+
+<# The following closed events trigger the appropriate external window to open based on
    the value that is set in the click event for each contextMenu.
    It circumvents a graphical error of contextMenu not closing properly.
 #>
@@ -645,7 +649,7 @@ $window.contextMenuPrinters.add_Closed({
     # if Add > Printer (Quick) is clicked
     if($temp -like $args[0].Items[0].Items[0].Name)
     {
-        Invoke-AddPrinterWindow
+        Invoke-ShowAddPrinterWindow
         Invoke-Update
     }
     # if Add > Printer is clicked
@@ -693,7 +697,8 @@ $window.contextMenuPorts.add_Closed({
         Add-Driver_Click
     }
 })
-# ContextMenu click events
+
+# Printer Tab: Context menu click events
 $window.menuItemPrinterAddPrinter.add_Click({
     $Global:clickedMenuItem = $args[0].Name
 })
@@ -720,6 +725,7 @@ $window.menuItemPrinterRemovePrinter.add_Click({
     Remove-Printer_Click
 })
 
+# Driver Tab: Context menu click events
 $window.menuItemDriverAddPrinter.add_Click({
     $Global:clickedMenuItem = $args[0].Name
 })
@@ -727,10 +733,10 @@ $window.menuItemDriverAddDriver.add_Click({
     $Global:clickedMenuItem = $args[0].Name
 })
 $window.menuItemDriverRemoveDriver.add_Click({
-Write-Host "Driver remove driver"
     Remove-Driver_Click
 })
 
+#Port Tab: Context menu click events
 $window.menuItemPortAddPrinter.add_Click({
     $Global:clickedMenuItem = $args[0].Name
 })
