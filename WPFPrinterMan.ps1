@@ -102,7 +102,7 @@ $xaml = @'
             </TabItem>
         </TabControl>
 
-        <TextBox Name="textBoxComputerName" CharacterCasing="Upper" HorizontalAlignment="Left" Height="23" Margin="111,12,0,0" TextWrapping="Wrap" Text="TextBox" VerticalAlignment="Top" Width="167" FontSize="14"/>
+        <TextBox Name="textBoxComputerName" CharacterCasing="Upper" HorizontalAlignment="Left" Height="23" Margin="111,12,0,0" TextWrapping="Wrap" Text="Loading..." VerticalAlignment="Top" Width="167" FontSize="14"/>
         <Label Content="Computer Name:" Margin="5,9,0,0" VerticalAlignment="Top" HorizontalAlignment="Left" Width="101"/>
         <Button x:Name="btnLoad" Content="Load" HorizontalAlignment="Left" Margin="283,12,0,0" VerticalAlignment="Top" Width="74" Height="23"/>
         <Button x:Name="btnRestartSpooler" Content="Restart Spooler" HorizontalAlignment="Left" Margin="362,12,0,0" VerticalAlignment="Top" Width="107" Height="23"/>
@@ -221,6 +221,9 @@ function Invoke-Update{
         $window.listViewPrinters.ItemsSource = @(Get-Printer -ComputerName $global:ComputerName | Where-Object -Property DeviceType -Like 'print' | Sort-Object)
         $window.listViewDrivers.ItemsSource = @(Get-PrinterDriver -ComputerName $global:ComputerName | Sort-Object)
         $window.listViewPorts.ItemsSource = @(Get-PrinterPort -ComputerName $global:ComputerName | Sort-Object)
+
+        #$tempCont = [System.Windows.TemplateContent] "<TextBox Text='it works'/>"
+        #$window.listViewPrinters.View.Columns[2].CellTemplate.Template = $tempCont
     }
     else
     {
@@ -249,7 +252,7 @@ function Add-Driver_Click{
 }
 
 # Opens the print queue popup of selected printer
-function View-PrintQueue{
+function Show-PrintQueue {
     $printerCol = $window.listViewPrinters.SelectedItems
     foreach($p in $printerCol) {
         rundll32 printui.dll,PrintUIEntry /o /n\\$global:ComputerName\$($p.Name)
@@ -342,18 +345,6 @@ function Remove-Port_Click{
     }
 }
 
-# Currently using doubleclick to open up the browser to the selected IP printers
-
-# Subscribes the TextBlocks of the IP address to a click event
-# function Subscribe-PortClickEvents{
-#     #$ports = $window.listViewPrinters.Items.
-#     $portAddress = ($window.listViewPorts.Items | ? {$_.Name -like $portName}).printerhostaddress
-#     if( $portAddress -match '^\b(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\b$')
-#     {
-#         Start-Process "http://$portAddress"
-#     }
-# }
-
 # Fills in Computer TextBox with local computer name and then Updates the list.
 function Invoke-Initialize{
     $Global:PrinterConnections = @(
@@ -366,7 +357,7 @@ function Invoke-Initialize{
 }
 
 # Printer Add Pop-Up Window functions
-function Validate-Printer{
+function Test-Printer{
     
     $isValidIPAddress = ($window1.comboBoxPrinterConnection.Text -like $Global:PrinterConnections[0] -and $window1.textBoxPrinterConnection.Text.Trim() -match
         '^\b(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\b$'
@@ -449,13 +440,15 @@ function Install-Printer([switch] $stop){
     
     # Check if printer is valid
     $computer = $Global:ComputerName
-    $printer = Validate-Printer
+    $printer = Test-Printer
 
     # Check if buttonInstallPrinter is set to install or stop installation
+    if($window1.buttonInstallPrinter.Content -like "Stop") {
+        $global:aSync.PowerShell.Stop()
+    }
     if($window1.buttonInstallPrinter.Content -like "Stop" -or $stop){
         $window1.buttonInstallPrinter.Content = "Install"
         $window1.buttonInstallPrinter.ToolTip = "Install printer"
-        $global:aSync.PowerShell.Stop()
         Write-Console "Cancelled install"
         return
     } elseif($null -eq $printer) {
@@ -709,7 +702,7 @@ $window.menuItemPrinterAddDriver.add_Click({
     $Global:clickedMenuItem = $args[0].Name
 })
 $window.menuItemPrinterPrintQueue.add_Click({
-    View-PrintQueue
+    Show-PrintQueue 
 })
 $window.menuItemPrinterPrintTestPage.add_Click({
     $Global:clickedMenuItem = $args[0].Name
@@ -747,8 +740,11 @@ $window.menuItemPortRemovePort.add_Click({
     Remove-Port_Click
 })
 
+$window.add_contentRendered({
+    Invoke-Initialize
+})
+
 #------------------------Code-----------------------------
 
-Invoke-Initialize
 
 $null = Show-WPFWindow -Window $window
